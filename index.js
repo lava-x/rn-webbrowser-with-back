@@ -4,7 +4,13 @@ import React from "react";
 
 import PropTypes from "prop-types";
 
-import { View, WebView } from "react-native";
+import {
+  View,
+  WebView,
+  Dimensions,
+  RefreshControl,
+  ScrollView
+} from "react-native";
 
 import BaseComponent from "./BaseComponent";
 import Utils from "./Utils";
@@ -33,7 +39,8 @@ const propTypes = {
   onBackPress: PropTypes.func,
   jsCode: PropTypes.string,
   cookie: PropTypes.string,
-  webviewProps: PropTypes.object
+  webviewProps: PropTypes.object,
+  pullToRefresh: PropTypes.bool
 };
 
 const defaultProps = {
@@ -48,7 +55,8 @@ const defaultProps = {
   backButtonVisible: true,
   jsCode: null,
   cookie: "",
-  webviewProps: {}
+  webviewProps: {},
+  pullToRefresh: true
 };
 
 class Webbrowser extends BaseComponent {
@@ -64,7 +72,8 @@ class Webbrowser extends BaseComponent {
       loading: true,
       scalesPageToFit: true,
       jsCode: this.props.jsCode,
-      cookie: this.props.cookie
+      cookie: this.props.cookie,
+      refreshing: false
     };
 
     this._bind(
@@ -148,14 +157,32 @@ class Webbrowser extends BaseComponent {
 
   render() {
     return (
-      <View
-        style={[
+      <ScrollView
+        contentContainerStyle={[
           styles.container,
           this.props.backgroundColor && {
             backgroundColor: this.props.backgroundColor
           }
         ]}
+        refreshControl={
+          this.props.pullToRefresh ? (
+            <RefreshControl
+              refreshing={this.state.refreshing}
+              onRefresh={this.refresh}
+              title={"Refreshing"}
+            />
+          ) : null
+        }
       >
+        {this.state.refreshing && (
+          <View
+            style={{
+              zIndex: 1000,
+              height: Dimensions.get("window").height,
+              backgroundColor: "#f0f0f0"
+            }}
+          />
+        )}
         <View style={styles.header}>
           <View style={{ flexDirection: "row" }}>
             {/* {this.renderBackButton()} */}
@@ -180,9 +207,10 @@ class Webbrowser extends BaseComponent {
             ? { injectedJavaScript: this.state.jsCode }
             : {})}
           {...this.props.webviewProps}
+          onLoadEnd={() => this.setState({ refreshing: false })}
         />
         {this.renderToolbar()}
-      </View>
+      </ScrollView>
     );
   }
 
@@ -211,6 +239,11 @@ class Webbrowser extends BaseComponent {
   stop() {
     this.refs[WEBVIEW_REF].stopLoading();
   }
+
+  refresh = () => {
+    this.setState({ refreshing: true });
+    this.refs[WEBVIEW_REF].reload();
+  };
 
   onShouldStartLoadWithRequest(event) {
     return this.props.onShouldStartLoadWithRequest(event);
